@@ -61,15 +61,15 @@
             <p class="text-sm text-gray-500 mt-2">Перетягніть терміни (ліворуч) до відповідних визначень (праворуч).</p>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Draggable Terms Column -->
-            <div id="terms-container" class="space-y-4 p-4 bg-gray-50 rounded-lg shadow-inner order-2 lg:order-1">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <!-- Draggable Terms Column (40% width on large screens) -->
+            <div id="terms-container" class="space-y-4 p-4 bg-gray-50 rounded-lg shadow-inner order-2 lg:order-1 lg:col-span-2">
                 <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Терміни</h2>
                 <!-- Terms will be inserted here by JavaScript and shuffled -->
             </div>
 
-            <!-- Drop Zones Column -->
-            <div id="definitions-container" class="space-y-6 order-1 lg:order-2">
+            <!-- Drop Zones Column (60% width on large screens) -->
+            <div id="definitions-container" class="space-y-6 order-1 lg:order-2 lg:col-span-3">
                 <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Визначення</h2>
                 <!-- Definitions and Drop Zones -->
             </div>
