@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вправа: Співставлення термінів — Інклюзивний UX-дизайн</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the game */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .term {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+        }
+        .term:active {
+            cursor: grabbing;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        .drop-zone {
+            min-height: 80px;
+            background-color: #ffffff;
+            border: 2px dashed #a0aec0;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .drop-zone.drag-over {
+            background-color: #ebf8ff; /* blue-100 */
+            border-color: #3182ce; /* blue-600 */
+        }
+        .correct {
+            background-color: #9ae6b4 !important; /* green-300 */
+            border-color: #38a169 !important; /* green-600 */
+        }
+        .incorrect {
+            background-color: #feb2b2 !important; /* red-300 */
+            border-color: #e53e3e !important; /* red-600 */
+        }
+        .correct .term {
+            background-color: #48bb78 !important; /* green-500 */
+            color: white;
+            cursor: default;
+        }
+        .incorrect .term {
+            background-color: #e53e3e !important; /* red-600 */
+            color: white;
+            cursor: default;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-6xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-10">
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 mb-2">🧠 Вправа: Співставлення термінів</h1>
+            <p class="text-xl text-gray-600">Інклюзивний UX-дизайн</p>
+            <p class="text-sm text-gray-500 mt-2">Перетягніть терміни (ліворуч) до відповідних визначень (праворуч).</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Draggable Terms Column -->
+            <div id="terms-container" class="space-y-4 p-4 bg-gray-50 rounded-lg shadow-inner order-2 lg:order-1">
+                <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Терміни</h2>
+                <!-- Terms will be inserted here by JavaScript and shuffled -->
+            </div>
+
+            <!-- Drop Zones Column -->
+            <div id="definitions-container" class="space-y-6 order-1 lg:order-2">
+                <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Визначення</h2>
+                <!-- Definitions and Drop Zones -->
+            </div>
+        </div>
+
+        <!-- Feedback and Actions -->
+        <div class="mt-10 pt-6 border-t flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+            <button id="check-btn" onclick="checkMatches()" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50">
+                Перевірити Співставлення
+            </button>
+            <div id="feedback" class="text-lg font-medium"></div>
+            <button id="reset-btn" onclick="resetGame()" class="px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition-colors hidden">
+                Скинути та Перемішати
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const matches = [
+            { id: '1', term: 'Інклюзивний дизайн', definition: 'Методологія проєктування, що враховує повний спектр людської різноманітності як джерело інновацій.' },
+            { id: '2', term: 'Доступність', definition: 'Якість, що робить досвід відкритим для всіх, особливо для людей з обмеженими можливостями. (Фокус: Результат)' },
+            { id: '3', term: 'Юзабіліті', definition: 'Ступінь, до якої продукт може використовуватися для досягнення цілей ефективно, продуктивно та із задоволенням. (Фокус: Ефективність)' },
+            { id: '4', term: 'Спектр Персон', definition: 'Концепція, що показує, як обмеження можливостей є динамічним спектром (постійні, тимчасові, ситуаційні).' },
+            { id: '5', term: 'Розпізнавати виключення', definition: 'Принцип: Визнати, що інвалідність — це не особиста проблема, а "невідповідність у взаємодії між людиною та суспільством".' },
+            { id: '6', term: 'Вирішувати для одного', definition: 'Принцип: Проєктування для людей з постійними обмеженнями створює рішення, які приносять користь набагато ширшій аудиторії ("ефект бордюру").' },
+            { id: '7', term: 'POUR', definition: 'Акронім чотирьох основоположних принципів WCAG: Сприйнятність, Операбельність, Зрозумілість, Надійність.' },
+            { id: '8', term: 'Ситуаційне обмеження', definition: 'Обмеження, викликане зовнішніми обставинами, наприклад, батько, який тримає на руках дитину і користується лише однією рукою.' },
+        ];
+
+        let draggedItem = null;
+        const termsContainer = document.getElementById('terms-container');
+        const definitionsContainer = document.getElementById('definitions-container');
+        const feedbackElement = document.getElementById('feedback');
+        const checkBtn = document.getElementById('check-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Utility to shuffle an array
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createTermElement(match) {
+            const termEl = document.createElement('div');
+            termEl.className = 'term px-4 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md select-none transition-all duration-200';
+            termEl.textContent = match.term;
+            termEl.setAttribute('data-id', match.id);
+            termEl.setAttribute('draggable', true);
+            termEl.addEventListener('dragstart', handleDragStart);
+            termEl.addEventListener('dragend', handleDragEnd);
+            return termEl;
+        }
+
+        function createDropZoneElement(match) {
+            const dropZoneWrapper = document.createElement('div');
+            dropZoneWrapper.className = 'p-3 bg-gray-100 rounded-lg shadow-sm';
+
+            const definitionText = document.createElement('p');
+            definitionText.className = 'text-sm text-gray-700 mb-2';
+            definitionText.textContent = match.definition;
+
+            const dropZoneEl = document.createElement('div');
+            dropZoneEl.className = 'drop-zone p-2 rounded-lg flex items-center justify-center text-gray-500 italic';
+            dropZoneEl.textContent = 'Перетягніть термін сюди';
+            dropZoneEl.setAttribute('data-id', match.id);
+            dropZoneEl.addEventListener('dragover', handleDragOver);
+            dropZoneEl.addEventListener('dragleave', handleDragLeave);
+            dropZoneEl.addEventListener('drop', handleDrop);
+
+            dropZoneWrapper.appendChild(definitionText);
+            dropZoneWrapper.appendChild(dropZoneEl);
+            return dropZoneWrapper;
+        }
+
+        function renderGame() {
+            // Clear containers
+            termsContainer.innerHTML = '<h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Терміни</h2>';
+            definitionsContainer.innerHTML = '<h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Визначення</h2>';
+            feedbackElement.textContent = '';
+            checkBtn.classList.remove('hidden');
+            resetBtn.classList.add('hidden');
+            checkBtn.disabled = false;
+
+            const shuffledTerms = shuffle([...matches]);
+            const definitionsInOrder = [...matches]; // Definitions remain in fixed order
+
+            // Render terms
+            shuffledTerms.forEach(match => {
+                termsContainer.appendChild(createTermElement(match));
+            });
+
+            // Render definitions
+            definitionsInOrder.forEach(match => {
+                definitionsContainer.appendChild(createDropZoneElement(match));
+            });
+        }
+
+        // --- Drag and Drop Handlers ---
+
+        function handleDragStart(e) {
+            draggedItem = e.target;
+            e.dataTransfer.setData('text/plain', e.target.dataset.id); // Set the term ID
+            setTimeout(() => {
+                e.target.style.opacity = '0.4';
+            }, 0);
+        }
+
+        function handleDragEnd(e) {
+            e.target.style.opacity = '1';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Necessary to allow dropping
+            if (e.target.classList.contains('drop-zone')) {
+                e.target.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            if (e.target.classList.contains('drop-zone')) {
+                e.target.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropZone = e.target.closest('.drop-zone');
+
+            if (draggedItem && dropZone) {
+                dropZone.classList.remove('drag-over');
+
+                // Check if the drop zone already has a term, if so, move it back
+                if (dropZone.querySelector('.term')) {
+                    const existingTerm = dropZone.querySelector('.term');
+                    termsContainer.appendChild(existingTerm);
+                }
+
+                // Append the new term
+                dropZone.innerHTML = '';
+                dropZone.appendChild(draggedItem);
+                draggedItem.style.opacity = '1'; // Reset opacity after drop
+
+                // Clear feedback
+                feedbackElement.textContent = '';
+            }
+        }
+
+        // --- Game Logic ---
+
+        function checkMatches() {
+            let correctCount = 0;
+            let totalCount = matches.length;
+            const dropZones = definitionsContainer.querySelectorAll('.drop-zone');
+
+            dropZones.forEach(zone => {
+                zone.classList.remove('correct', 'incorrect');
+                const droppedTerm = zone.querySelector('.term');
+                const definitionId = zone.getAttribute('data-id');
+
+                if (droppedTerm) {
+                    const termId = droppedTerm.getAttribute('data-id');
+
+                    if (termId === definitionId) {
+                        correctCount++;
+                        zone.classList.add('correct');
+                    } else {
+                        zone.classList.add('incorrect');
+                    }
+                    // Disable dragging after checking
+                    droppedTerm.setAttribute('draggable', false);
+                    droppedTerm.style.cursor = 'default';
+                } else {
+                    // If empty, consider it incorrect and mark the zone (optional, but good for feedback)
+                    zone.classList.add('incorrect');
+                }
+            });
+
+            // Display results
+            feedbackElement.classList.remove('text-green-600', 'text-red-600');
+            if (correctCount === totalCount) {
+                feedbackElement.textContent = `🎉 Ідеально! Усі ${correctCount} термінів співставлені правильно!`;
+                feedbackElement.classList.add('text-green-600');
+                checkBtn.disabled = true;
+            } else {
+                feedbackElement.textContent = `🤔 Результат: ${correctCount} з ${totalCount} правильних. Спробуйте ще раз, щоб виправити помилки!`;
+                feedbackElement.classList.add('text-red-600');
+                // Re-enable dragging for incorrect items
+                dropZones.forEach(zone => {
+                    const droppedTerm = zone.querySelector('.term');
+                    if (droppedTerm && zone.classList.contains('incorrect')) {
+                        droppedTerm.setAttribute('draggable', true);
+                        droppedTerm.style.cursor = 'grab';
+                    }
+                });
+            }
+            resetBtn.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            // Re-render the game to reset positions and styles
+            renderGame();
+        }
+
+        // Initialize the game when the window loads
+        window.onload = renderGame;
+    </script>
+</body>
+</html>
